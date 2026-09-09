@@ -117,8 +117,9 @@ typedef struct LNK_LinkResult
 
 // -- Image Layout ------------------------------------------------------------
 
-#define LNK_REMOVED_SECTION_NUMBER_32 (U32)-3
-#define LNK_REMOVED_SECTION_NUMBER_16 (U16)-3
+#define LNK_REMOVED_ASSOCIATIVE_SYMBOL_VALUE ((U32)-4)
+#define LNK_REMOVED_SECTION_NUMBER_32        ((U32)-3)
+#define LNK_REMOVED_SECTION_NUMBER_16        ((U16)-3)
 
 typedef struct LNK_ImageContext
 {

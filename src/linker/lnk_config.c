@@ -2845,6 +2845,7 @@ lnk_make_default_cmd_line(Arena *arena, LNK_CmdLine user_cmd_line)
     "/RAD_LOG:io_write",
     #else
     (char*)str8f(scratch.arena, "/RAD_IGNORE:%u", LNK_Error_InvalidTypeIndex).str,
+    (char*)str8f(scratch.arena, "/RAD_IGNORE:%u", LNK_Warning_RelocationAgainstRemovedAssociativeSection).str,
     #endif
   };
 

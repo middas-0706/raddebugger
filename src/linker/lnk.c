@@ -4392,6 +4392,11 @@ THREAD_POOL_TASK_FUNC(lnk_patch_regular_symbols_task)
       if (sc == task->null_sc) {
         section_number = lnk_obj_get_removed_section_number(obj);
         value          = max_U32;
+        
+        COFF_ComdatSelectType selection = COFF_ComdatSelect_Null;
+        if (lnk_try_comdat_props_from_section_number(obj, symbol.section_number, &selection, 0, 0, 0) && selection == COFF_ComdatSelect_Associative) {
+          value = LNK_REMOVED_ASSOCIATIVE_SYMBOL_VALUE;
+        }
       } else {
         section_number = safe_cast_u32(sc->u.sect_idx + 1);
         value          = sc->u.off + symbol.value;
@@ -4429,7 +4434,7 @@ lnk_patch_obj_symtab(LNK_SymbolTable *symtab, LNK_Obj *obj, B8 *was_symbol_patch
       U32 value;
       if (was_fixup_removed || fixup_type == COFF_SymbolValueInterp_Undefined || fixup_type == COFF_SymbolValueInterp_Weak) {
         section_number = lnk_obj_get_removed_section_number(obj);
-        value          = 0;
+        value          = was_fixup_removed && fixup_src.value == LNK_REMOVED_ASSOCIATIVE_SYMBOL_VALUE ? LNK_REMOVED_ASSOCIATIVE_SYMBOL_VALUE : 0;
       } else {
         section_number = fixup_src.section_number;
         value          = fixup_src.value;
@@ -4562,16 +4567,35 @@ THREAD_POOL_TASK_FUNC(lnk_obj_reloc_patcher)
         COFF_SymbolValueInterpType interp = coff_interp_from_parsed_symbol(symbol);
         if (interp == COFF_SymbolValueInterp_Regular) {
           if (symbol.section_number == lnk_obj_get_removed_section_number(obj)) {
-            if (~section_flags & LNK_SECTION_FLAG_DEBUG) {
-              String8 sect_name   = coff_name_from_section_header(string_table, section_header);
-              String8 symbol_name = lnk_symbol_name_from_coff_symbol_idx(obj, reloc->isymbol);
-              lnk_error_obj(LNK_Error_RelocationAgainstRemovedSection, obj, "relocating against symbol that is in a removed section (symbol: %S, reloc-section: %S 0x%llx, reloc-index: 0x%llx)", symbol_name, sect_name, it.v.section_number, reloc_idx);
+
+            // With /OPT:REF, linkers may partially discard functions. In this case, relocations referencing those symbols must be left unchanged.
+            // the rule is to leave the relocations to those symbols as they are.
+            if (section_flags & LNK_SECTION_FLAG_DEBUG) { continue; }
+
+            {
+              Temp scratch = scratch_begin(0,0);
+
+              String8 sect_name     = coff_name_from_section_header(string_table, section_header);
+              String8 symbol_name   = lnk_symbol_name_from_coff_symbol_idx(obj, reloc->isymbol);
+              String8 error_message = str8f(scratch.arena, "relocating against symbol that is in a removed section (symbol: %S, reloc-section: %S 0x%llx, reloc-index: 0x%llx)", symbol_name, sect_name, it.v.section_number, reloc_idx);
+
+              // MSVC allows relocations to reference discarded associative sections
+              if (symbol.value == LNK_REMOVED_ASSOCIATIVE_SYMBOL_VALUE) {
+                lnk_error_obj(LNK_Warning_RelocationAgainstRemovedAssociativeSection, obj, "%S", error_message);
+                goto next_reloc;
+              }
+
+              lnk_error_obj(LNK_Error_RelocationAgainstRemovedSection, obj, "%S", error_message);
+              goto next_reloc;
+
+              next_reloc:;
+                         scratch_end(scratch);
             }
-            continue;
+          } else {
+            symbol_secnum = symbol.section_number;
+            symbol_secoff = symbol.value;
+            symbol_voff   = safe_cast_u32((U64)task->image_section_table[symbol.section_number]->voff + (U64)symbol_secoff);
           }
-          symbol_secnum = symbol.section_number;
-          symbol_secoff = symbol.value;
-          symbol_voff   = safe_cast_u32((U64)task->image_section_table[symbol.section_number]->voff + (U64)symbol_secoff);
         } else if (interp == COFF_SymbolValueInterp_Abs) {
           // There aren't enough bits in COFF symbol to store full image base address,
           // so we special case __ImageBase. A better solution would be to add
