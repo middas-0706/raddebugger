@@ -1118,14 +1118,17 @@ rb_thread_entry_point(void *p)
           {
             U64 count = 0;
             RDI_SourceFile *v = rdi_table_from_name(rdi, SourceFiles, &count);
-            Rng1U64 range = lane_range(count);
-            for EachInRange(idx, range)
+            if(count > 0)
             {
-              String8List *out = &p2b_shared->lane_file_dumps[lane_idx()];
-              Temp scratch = scratch_begin(&arena, 1);
-              String8 src_path = str8_from_rdi_path_node_idx(scratch.arena, rdi, PathStyle_Relative, v[idx].file_path_node_idx);
-              str8_list_pushf(arena, out, "FILE %I64u %S\n", idx, src_path);
-              scratch_end(scratch);
+              Rng1U64 range = lane_range(count-1);
+              for EachInRange(idx, range)
+              {
+                String8List *out = &p2b_shared->lane_file_dumps[lane_idx()];
+                Temp scratch = scratch_begin(&arena, 1);
+                String8 src_path = str8_from_rdi_path_node_idx(scratch.arena, rdi, PathStyle_Relative, v[idx+1].file_path_node_idx);
+                str8_list_pushf(arena, out, "FILE %I64u %S\n", idx+1, src_path);
+                scratch_end(scratch);
+              }
             }
           }
           
