@@ -1143,7 +1143,6 @@ rb_thread_entry_point(void *p)
               RDI_Scope *root_scope = rdi_element_from_name_idx(rdi, Scopes, proc->root_scope_idx);
               if(root_scope->voff_range_opl > root_scope->voff_range_first)
               {
-                
                 // rjf: dump function record
                 RDIM_Rng1U64 voff_range =
                 {
@@ -1152,7 +1151,8 @@ rb_thread_entry_point(void *p)
                 };
                 {
                   Temp scratch = scratch_begin(0, 0);
-                  str8_list_pushf(arena, out, "FUNC %I64x %I64x %I64x %S\n", voff_range.min, voff_range.max-voff_range.min, 0ull, fully_qualified_str8_from_rdi_symbol(scratch.arena, rdi, proc));
+                  String8 name = fully_qualified_str8_from_rdi_symbol(scratch.arena, rdi, proc);
+                  str8_list_pushf(arena, out, "FUNC %I64x %I64x %I64x %S\n", voff_range.min, voff_range.max-voff_range.min, 0ull, name);
                   scratch_end(scratch);
                 }
                 
