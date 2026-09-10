@@ -1035,11 +1035,17 @@ rb_thread_entry_point(void *p)
         case OutputKind_Breakpad:
         {
           //- rjf: flatten to RDI data
-          String8List rdi_blobs = rdim_file_blobs_from_section_bundle(arena, serialized_section_bundle);
-          String8 rdi_data = str8_list_join(arena, &rdi_blobs, 0);
-          RDI_Parsed rdi_ = {0};
-          RDI_Parsed *rdi = &rdi_;
-          RDI_ParseStatus rdi_status = rdi_parse(rdi_data.str, rdi_data.size, rdi);
+          ProfBegin("flatten to RDI data");
+          RDI_Parsed *rdi = 0;
+          if(lane_idx() == 0)
+          {
+            String8List rdi_blobs = rdim_file_blobs_from_section_bundle(arena, serialized_section_bundle);
+            String8 rdi_data = str8_list_join(arena, &rdi_blobs, 0);
+            rdi = push_array(arena, RDI_Parsed, 1);
+            rdi_parse(rdi_data.str, rdi_data.size, rdi);
+          }
+          lane_sync_u64(&rdi, 0);
+          ProfEnd();
           
           //- rjf: set up shared state
           typedef struct P2B_Shared P2B_Shared;
